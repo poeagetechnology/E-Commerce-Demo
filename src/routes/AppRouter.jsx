@@ -42,7 +42,12 @@ const Protected = ({ children, roles }) => {
   return children;
 };
 
-const AppRouter = () => (
+const AppRouter = () => {
+  const { user, loading } = useAuthStore();
+
+  if (loading) return <PageLoader />;
+
+  return (
   <Suspense fallback={<PageLoader />}>
     <Routes>
       {/* Public */}
@@ -52,15 +57,15 @@ const AppRouter = () => (
       </Route>
 
       {/* User */}
-      <Route element={<Protected><UserLayout /></Protected>}>
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route path="/home" element={<Home />} />
+      <Route element={<UserLayout />}>
+        <Route path="/" element={user ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />} />
+        <Route path="/home" element={<Protected><Home /></Protected>} />
         <Route path="/products" element={<Products />} />
         <Route path="/product/:id" element={<ProductDetail />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/wishlist" element={<Wishlist />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/orders" element={<Orders />} />
+        <Route path="/cart" element={<Protected><Cart /></Protected>} />
+        <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
+        <Route path="/checkout" element={<Protected><Checkout /></Protected>} />
+        <Route path="/orders" element={<Protected><Orders /></Protected>} />
       </Route>
 
       {/* Admin */}
@@ -89,6 +94,7 @@ const AppRouter = () => (
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   </Suspense>
-);
+  );
+};
 
 export default AppRouter;
