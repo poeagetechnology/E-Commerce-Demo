@@ -22,9 +22,19 @@ export const getOrder = async (id) => {
 };
 
 export const getUserOrders = async (userId) => {
-  const q = query(collection(db, COL), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+  // Fetch without orderBy to avoid needing composite index
+  const q = query(collection(db, COL), where('userId', '==', userId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  
+  // Client-side sorting by createdAt descending
+  const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  orders.sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() || 0;
+    const bTime = b.createdAt?.toMillis?.() || 0;
+    return bTime - aTime;
+  });
+  
+  return orders;
 };
 
 export const getAllOrders = async () => {
@@ -39,9 +49,17 @@ export const updateOrderStatus = async (id, status) => {
 
 // Real-time order tracking
 export const subscribeToUserOrders = (userId, callback) => {
-  const q = query(collection(db, COL), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+  // Fetch without orderBy to avoid needing composite index
+  const q = query(collection(db, COL), where('userId', '==', userId));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    // Client-side sorting by createdAt descending
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    orders.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
+    });
+    callback(orders);
   });
 };
 

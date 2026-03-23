@@ -10,21 +10,45 @@ const COL = 'products';
 
 // Get all products with optional filters
 export const getProducts = async ({ category, minPrice, maxPrice, sortBy = 'createdAt', sortDir = 'desc', pageSize = 20, lastDoc } = {}) => {
-  let q = collection(db, COL);
   const constraints = [];
 
-  if (category) constraints.push(where('category', '==', category));
+  // If filtering by category, fetch without orderBy to avoid needing composite index
+  // Client-side sorting will be used instead
+  if (category) {
+    constraints.push(where('category', '==', category));
+  } else {
+    // Only use orderBy when not filtering by category (avoids composite index requirement)
+    constraints.push(orderBy(sortBy, sortDir));
+  }
+  
   if (minPrice !== undefined) constraints.push(where('price', '>=', minPrice));
   if (maxPrice !== undefined) constraints.push(where('price', '<=', maxPrice));
-  constraints.push(orderBy(sortBy, sortDir));
-  constraints.push(limit(pageSize));
-  if (lastDoc) constraints.push(startAfter(lastDoc));
+  
+  constraints.push(limit(pageSize * 2)); // Fetch more to account for client-side sorting
+  if (lastDoc && !category) constraints.push(startAfter(lastDoc)); // Pagination only works without filtering
 
-  q = query(collection(db, COL), ...constraints);
+  const q = query(collection(db, COL), ...constraints);
   const snap = await getDocs(q);
-  const lastVisible = snap.docs[snap.docs.length - 1];
+  
+  // Client-side sorting when category filter is applied
+  let docs = snap.docs;
+  if (category && sortBy) {
+    docs.sort((a, b) => {
+      const aVal = a.data()[sortBy];
+      const bVal = b.data()[sortBy];
+      
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    // Limit after sorting
+    docs = docs.slice(0, pageSize);
+  }
+  
+  const lastVisible = docs[docs.length - 1];
   return {
-    products: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+    products: docs.map(d => ({ id: d.id, ...d.data() })),
     lastVisible,
   };
 };

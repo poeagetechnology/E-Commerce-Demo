@@ -14,7 +14,17 @@ export const addReview = async ({ productId, userId, userName, rating, comment }
 };
 
 export const getProductReviews = async (productId) => {
-  const q = query(collection(db, COL), where('productId', '==', productId), orderBy('createdAt', 'desc'));
+  // Fetch without orderBy to avoid needing composite index
+  const q = query(collection(db, COL), where('productId', '==', productId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  
+  // Client-side sorting by createdAt descending
+  const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  reviews.sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() || 0;
+    const bTime = b.createdAt?.toMillis?.() || 0;
+    return bTime - aTime; // Descending order
+  });
+  
+  return reviews;
 };
